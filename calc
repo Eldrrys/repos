@@ -1,0 +1,347 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <math.h>
+#define SIZE 2000
+#define number_of_left_priority_operators 2
+typedef char StackElement;
+
+int previous_result;
+
+struct result {
+	char* error_marker;
+	int data;
+};
+struct Stack {
+	char str[SIZE + 1];
+};
+struct stack {
+	int str[SIZE + 1];
+};
+
+void stack_init(struct Stack* s) {
+	if (s == NULL)
+		exit(0);
+	s->str[0] = '\0';
+}
+
+size_t stack_size(struct Stack* s) {
+	if (!s)
+		exit(0);
+	return strlen(s->str);
+}
+
+StackElement Stack_peek(struct Stack* s) {
+	if (s == NULL)
+		exit(0);
+	return s->str[stack_size(s) - 1];
+}
+
+void Stack_push(struct Stack* s, StackElement x) {
+	if (s == NULL)
+		exit(0);
+	int size = stack_size(s);
+	if (size == SIZE - 1)
+		exit(0);
+	s->str[size] = x;
+	s->str[size + 1] = '\0';
+}
+
+StackElement Stack_pop(struct Stack* s) {
+	if (s == NULL)
+		exit(0);
+	int size = stack_size(s);
+	StackElement element = Stack_peek(s);
+	s->str[size - 1] = '\0';
+	return element;
+}
+
+void stack_delete(struct Stack* s) {
+	if (s == NULL)
+		exit(0);
+	int size = stack_size(s);
+	s->str[size - 1] = '\0';
+}
+
+bool is_bracket_in_stack(struct Stack* s) {
+	if (s == NULL)
+		exit(0);
+	int size = stack_size(s);
+	for (int i = size - 1; i >= 0; i--) {
+		if (s->str[i] == '(') {
+			return true;
+		}
+	}
+	return false;
+}
+
+int priority(char element) {
+	switch (element) {
+	case '^':
+		return 3;
+	case '*':
+	case '/':
+		return 2;
+	case '+':
+	case '-':
+		return 1;
+	}
+	return 0;
+}
+
+bool stack_is_empty(struct Stack* s) {
+	return stack_size(s) == 0;
+}
+
+bool is_number(char element) {
+	return (element >= '0' && element <= '9') || element == '$';
+}
+
+bool is_left_bracket(char element) {
+	return element == '(';
+}
+
+bool is_right_bracket(char element) {
+	return element == ')';
+}
+
+bool is_bracket(char element) {
+	return is_right_bracket(element) || is_left_bracket(element);
+}
+
+bool is_end_sim(char element) {
+	return element == '\n';
+}
+
+bool is_operator(char element) {
+	return priority(element) > 0;
+}
+
+bool check_input(char el, char next_el, int i, int counter) {
+	if (i == 0 && (is_operator(el) || is_right_bracket(el))) {
+		return false;
+	}
+	if (is_number(el) && is_left_bracket(next_el)) {
+		return false;
+	}
+	if (is_operator(el) && (is_operator(next_el) || is_right_bracket(next_el))) {
+		return false;
+	}
+	if (is_right_bracket(el) && (is_number(next_el) || is_left_bracket(next_el))) {
+		return false;
+	}
+	if (is_left_bracket(el) && (is_operator(next_el) || is_right_bracket(next_el))) {
+		return false;
+	}
+	if (is_end_sim(next_el) && (is_operator(el) || is_left_bracket(el))) {
+		return false;
+	}
+	if (!is_bracket(el) && !is_number(el) && !is_operator(el)) {
+		return false;
+	}
+	if ((is_number(el) && next_el == '$') || (is_number(next_el) && el == '$')) {
+		return false;
+	}
+	if ((el == '$' || next_el == '$') && counter == 1) {
+		return false;
+	}
+	return true;
+}
+
+struct result calculate(char operator, int x, int y) {
+	struct result temp = {
+		.data = 0,
+		.error_marker = NULL,
+	};
+	switch (operator) {
+	case '^':
+		temp.data = pow(x, y);
+		return temp;
+	case '*':
+		temp.data = x * y;
+		return temp;
+	case '+':
+		temp.data = x + y;
+		return temp;
+	case '-':
+		temp.data = x - y;
+		return temp;
+	}
+	if (operator == '/') {
+		if (y != 0) {
+			temp.data = x / y;
+			return temp;
+		}
+		else {
+			temp.error_marker = "division by zero\n";
+			return temp;
+		}
+	}
+	return temp;
+}
+
+char* to_polish(char* input, int counter) {
+	struct Stack stack;
+	char* result = malloc(2 * SIZE * sizeof(char));
+	int len = strlen(input);
+	int count = 0;
+	char* error = malloc(2 * SIZE * sizeof(char));
+	strcpy(error, "syntax error\n");
+	stack_init(&stack);
+
+	if (len == 1) {
+		free(result);
+		return error;
+	}
+
+	for (int i = 0; i < len - 1; i++) {
+		if (!check_input(input[i], input[i + 1], i, counter)) {
+			free(result);
+			return error;
+		}
+		if (is_number(input[i])) {
+			result[count] = input[i];
+			count++;
+			if (!is_number(input[i + 1])) {
+				result[count] = ' ';
+				count++;
+			}
+		}
+		else {
+			if (!stack_is_empty(&stack)) {
+				if (input[i] == '(') {
+					Stack_push(&stack, input[i]);
+					continue;
+				}
+				if (input[i] == ')') {
+					if (!is_bracket_in_stack(&stack)) {
+						free(result);
+						return error;
+					}
+					while (Stack_peek(&stack) != '(') {
+						char element = Stack_pop(&stack);
+						result[count] = element;
+						count++;
+					}
+					if (Stack_peek(&stack) == '(') {
+						stack_delete(&stack);
+						continue;
+					}
+				}
+				int priority_i = priority(input[i]);
+				int priority_s = priority(Stack_peek(&stack));
+				if (priority_i <= number_of_left_priority_operators) {
+					if (priority_s >= priority_i) {
+						char element = Stack_pop(&stack);
+						result[count] = element;
+						count++;
+					}
+				}
+				else {
+					if (priority_s > priority_i) {
+						char element = Stack_pop(&stack);
+						result[count] = element;
+						count++;
+					}
+				}
+				Stack_push(&stack, input[i]);
+			}
+			else {
+				Stack_push(&stack, input[i]);
+			}
+		}
+	}
+	if (is_bracket_in_stack(&stack)) {
+		free(result);
+		return error;
+	}
+	while (!stack_is_empty(&stack)) {
+		result[count] = Stack_pop(&stack);
+		count++;
+	}
+	result[count] = '\0';
+	free(error);
+	return result;
+}
+
+struct result calculate_polish(char* input) {
+	int len = strlen(input);
+	struct result output = {
+		NULL,
+		0
+	};
+	int stack[SIZE] = { 0 };
+	int size_of_stack = 0;
+
+	for (int i = 0; i < len; i++) {
+		if (is_number(input[i])) {
+			int intermediate_result = 0;
+			while (is_number(input[i])) {
+				if (input[i] == '$') {
+					intermediate_result = previous_result;
+				}
+				else {
+					intermediate_result = (intermediate_result * 10) + (int)(input[i] - '0');
+				}
+				i++;
+				output.data = intermediate_result;
+			}
+			stack[size_of_stack] = intermediate_result;
+			size_of_stack++;
+		}
+		if (is_operator(input[i])) {
+			int x = stack[size_of_stack - 1];
+			int y = stack[size_of_stack - 2];
+			size_of_stack--;
+			output = calculate(input[i], y, x);
+			if (!output.error_marker) {
+				stack[size_of_stack - 1] = output.data;
+			}
+			else {
+				return output;
+			}
+		}
+	}
+	return output;
+}
+
+int main(int argc, char* argv[]) {
+	int counter = 1;
+	bool marker = false;
+	if (!strcmp(argv[argc - 1], "-i")) {
+		marker = true;
+	}
+	do {
+		char string[SIZE + 1];
+		if (marker) {
+			printf("in > ");
+		}
+		if (!fgets(string, SIZE + 1, stdin))
+			exit(0);
+		if (!strcmp(string, "exit\n")) {
+			exit(0);
+		}
+		if (marker) {
+			printf("out< ");
+		}
+		char* output = to_polish(string, counter);
+		if (!output || strcmp(output, "syntax error\n") == 0) {
+			printf("syntax error\n");
+		}
+		else {
+			struct result res = calculate_polish(output);
+			if (!res.error_marker) {
+				printf("%d\n", res.data);
+				previous_result = res.data;
+				counter++;
+			}
+			else {
+				printf("%s\n", res.error_marker);
+			}
+		}
+		free(output);
+	} while (marker);
+	return 0;
+}
